@@ -1,0 +1,23 @@
+version: '3.7'
+
+services:
+  auth_db:
+    hostname: auth_db123
+    image: postgres:16
+    container_name: auth_db
+    ports:
+      - "1337:5432"
+    env_file:
+      .env
+
+  auth_service:
+    hostname: auth_service
+    build:
+      context: .
+    container_name: auth_service
+    ports:
+      - "8000:8080"
+    env_file:
+      - .env
+    depends_on:
+      - auth_db
