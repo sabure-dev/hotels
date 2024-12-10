@@ -27,12 +27,18 @@ class AuthJWTSettings(BaseModel):
 
 
 class SMTPSettings(BaseModel):
+    smtp_user: str = os.environ.get("SMTP_USER")
+    smtp_pass: str = os.environ.get("SMTP_PASS")
+
     reset_password_token_expire_minutes: int = int(os.environ.get("RESET_PASSWORD_TOKEN_EXPIRE_MINUTES"))
     reset_password_email_template: str = os.environ.get("RESET_PASSWORD_EMAIL_TEMPLATE")
     reset_password_secret_key: str = os.environ.get("RESET_PASSWORD_SECRET_KEY")
-    smtp_user: str = os.environ.get("SMTP_USER")
-    smtp_pass: str = os.environ.get("SMTP_PASS")
     reset_password_algorithm: str = os.environ.get("RESET_PASSWORD_ALGORITHM")
+
+    email_verification_token_expire_hours: int = int(os.environ.get("EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS"))
+    email_verification_email_template: str = os.environ.get("EMAIL_VERIFICATION_EMAIL_TEMPLATE")
+    email_verification_secret_key: str = os.environ.get("EMAIL_VERIFICATION_SECRET_KEY")
+    email_verification_algorithm: str = os.environ.get("EMAIL_VERIFICATION_ALGORITHM")
 
 
 class Settings(BaseSettings):

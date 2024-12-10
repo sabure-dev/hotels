@@ -119,5 +119,11 @@ async def validate_auth_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="user inactive",
         )
+        
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="email not verified",
+        )
 
     return user

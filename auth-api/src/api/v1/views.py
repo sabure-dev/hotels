@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import status, Response
 
-from core.utils import send_password_reset_email, reset_password_util
+from core.config import settings
+from core.utils import send_password_reset_email, reset_password_util, send_verification_email
 from . import schemas as user_schemas
 from core.helpers import create_refresh_token, create_access_token
 from core.schemas import TokenInfo
@@ -48,7 +49,7 @@ def auth_refresh_jwt(
 @router.post("/create", response_model=user_schemas.UserOut, status_code=status.HTTP_201_CREATED)
 async def create_user(user: user_schemas.CreateUser, session: AsyncSession = Depends(get_session)):
     user = await create_user_crud(user_in=user, session=session)
-
+    await send_verification_email(user)
     return user
 
 
@@ -76,7 +77,7 @@ async def request_password_reset(
     return {"detail": "Password reset instructions sent to email"}
 
 
-@router.post("/password-reset")
+@router.get("/password-reset")
 async def reset_password(
     session: Annotated[AsyncSession, Depends(get_session)],
     password_reset_request: Annotated[PasswordResetRequest, Body()]
@@ -84,3 +85,46 @@ async def reset_password(
     await reset_password_util(session=session, password_reset_request=password_reset_request)
 
     return {"detail": "Successful password reset"}
+
+
+@router.get("/verify-email")
+async def verify_email(
+    token: str,
+    session: AsyncSession = Depends(get_session)
+):
+    try:
+        payload = jwt.decode(
+            token, 
+            settings.smtp.email_verification_secret_key,
+            algorithms=[settings.smtp.email_verification_algorithm]
+        )
+        
+        if datetime.now(timezone.utc) > datetime.fromtimestamp(payload["exp"], tz=timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verification link has expired"
+            )
+
+        email = payload["sub"]
+        user = await get_user_by_email(session=session, email=email)
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+            
+        if user.is_verified:
+            return {"message": "Email already verified"}
+            
+        user.is_verified = True
+        session.add(user)
+        await session.commit()
+        
+        return {"message": "Email verified successfully"}
+        
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification token"
+        )
