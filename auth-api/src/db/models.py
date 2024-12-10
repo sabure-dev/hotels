@@ -16,6 +16,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(unique=True)
     hashed_password: Mapped[bytes]
     active: Mapped[bool] = mapped_column(default=True)
+    is_verified: Mapped[bool] = mapped_column(default=False)
     roles: Mapped[list["Role"]] = relationship(secondary="users_roles")
     created_at: Mapped[created_at]
 

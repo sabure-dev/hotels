@@ -74,7 +74,7 @@ def validate_password(
 
 async def send_password_reset_email(user):
     reset_token = create_password_reset_token(user)
-    reset_url = f"http://localhost:8000/password-reset?token={reset_token}"
+    reset_url = f"http://localhost:8000/api/v1/password-reset?token={reset_token}"
 
     msg = MIMEText(settings.smtp.reset_password_email_template.format(reset_url=reset_url))
     msg['Subject'] = 'Password Reset Instructions'
@@ -112,3 +112,26 @@ async def reset_password_util(session: AsyncSession, password_reset_request: Pas
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid token"
         )
+
+
+async def send_verification_email(user):
+    verification_token = create_verification_token(user)
+    verification_url = f"http://localhost:8000/api/v1/verify-email?token={verification_token}"
+
+    msg = MIMEText(f"Пожалуйста, подтвердите ваш email, перейдя по ссылке: {verification_url}")
+    msg['Subject'] = 'Подтверждение email'
+    msg['From'] = settings.smtp.smtp_user
+    msg['To'] = user.email
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        smtp.login(settings.smtp.smtp_user, settings.smtp.smtp_pass)
+        smtp.send_message(msg)
+
+
+def create_verification_token(user):
+    data = {
+        "sub": user.email,
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.smtp.email_verification_token_expire_hours)
+    }
+    return jwt.encode(data, settings.smtp.email_verification_secret_key,
+                      algorithm=settings.smtp.email_verification_algorithm)
