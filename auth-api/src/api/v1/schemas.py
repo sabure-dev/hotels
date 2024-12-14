@@ -34,6 +34,8 @@ class UserOut(BaseModel):
     email: EmailStr
     full_name: Annotated[str, MaxLen(30)]
     created_at: datetime
+    is_verified: bool
+    active: bool
 
 
 class UserSchema(BaseModel):
@@ -43,6 +45,7 @@ class UserSchema(BaseModel):
     hashed_password: str
     full_name: Annotated[str, MaxLen(30)]
     active: bool
+    is_verified: bool
 
 
 class PasswordResetRequest(BaseModel):

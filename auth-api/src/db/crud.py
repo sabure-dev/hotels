@@ -1,5 +1,6 @@
 import sqlalchemy
 from fastapi import HTTPException
+from pydantic import EmailStr
 from sqlalchemy import select
 from fastapi import status
 
@@ -53,11 +54,31 @@ async def get_user_by_email(email: str, session: AsyncSession) -> user_schemas.U
     return user
 
 
-async def get_user_model_by_email(email: str, session: AsyncSession):
+async def get_user_model_by_email(email: str, session: AsyncSession) -> user_models.User:
     query = select(user_models.User).where(user_models.User.email == email)
     response = await session.execute(query)
     user = response.scalars().first()
 
+    return user
+
+
+async def update_user_fullname_crud(new_fullname: str, session: AsyncSession,
+                                    current_user: user_schemas.UserSchema) -> user_schemas.UserOut:
+    user = await get_user_by_id(current_user.id, session)
+    user.full_name = new_fullname
+    await session.commit()
+    return user
+
+
+async def update_user_email_crud(new_email: EmailStr, session: AsyncSession,
+                                 current_user: user_schemas.UserSchema) -> user_schemas.UserOut:
+    if new_email == current_user.email:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New email should be different")
+
+    user = await get_user_by_id(current_user.id, session)
+    user.email = new_email
+    user.is_verified = False
+    await session.commit()
     return user
 
 

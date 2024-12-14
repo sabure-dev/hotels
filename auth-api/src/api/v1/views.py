@@ -3,6 +3,7 @@ from typing import Annotated
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Body
+from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import status, Response
 
@@ -13,7 +14,8 @@ from core.helpers import create_refresh_token, create_access_token
 from core.schemas import TokenInfo
 from core.validation import validate_auth_user, get_current_active_auth_user_for_refresh, \
     get_current_active_auth_user, validate_create_user_role
-from db.crud import create_user_crud, delete_user_crud, get_user_by_email
+from db.crud import create_user_crud, delete_user_crud, get_user_by_email, update_user_fullname_crud, \
+    update_user_email_crud
 from db.database import get_session
 from .schemas import UserSchema, PasswordResetRequest
 
@@ -53,6 +55,24 @@ async def create_user(user: Annotated[user_schemas.CreateUser, Depends(validate_
     user = await create_user_crud(user_in=user, session=session)
     await send_verification_email(user)
     return user
+
+
+@router.patch("/update_fullname", response_model=user_schemas.UserOut, status_code=status.HTTP_200_OK)
+async def update_user_fullname(
+        new_fullname: Annotated[str, Body()], session: AsyncSession = Depends(get_session),
+        user: UserSchema = Depends(get_current_active_auth_user)):
+    updated_user = await update_user_fullname_crud(new_fullname=new_fullname, session=session, current_user=user)
+    return updated_user
+
+
+@router.patch("/update_email", response_model=user_schemas.UserOut, status_code=status.HTTP_200_OK)
+async def update_user_email(
+        new_email: Annotated[EmailStr, Body()], session: AsyncSession = Depends(get_session),
+        user: UserSchema = Depends(get_current_active_auth_user)
+):
+    updated_user = await update_user_email_crud(new_email=new_email, session=session, current_user=user)
+    await send_verification_email(user)
+    return updated_user
 
 
 @router.delete("/delete", status_code=status.HTTP_204_NO_CONTENT)
