@@ -14,11 +14,18 @@ from core import utils as auth_utils
 
 async def create_user_crud(user_in: user_schemas.CreateUser, session: AsyncSession) -> user_schemas.UserOut:
     try:
+        role = await get_role_by_title(user_in.role.value, session)
+        if not role:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Role {user_in.role.value} not found"
+            )
 
         hashed_password = auth_utils.hash_password(user_in.hashed_password)
         new_user = user_models.User(email=user_in.email,
                                     full_name=user_in.full_name,
-                                    hashed_password=hashed_password)
+                                    hashed_password=hashed_password,
+                                    role_id=role.id)
 
         session.add(new_user)
         await session.commit()
@@ -78,3 +85,9 @@ async def reset_password_crud(session: AsyncSession, email: str, password_reset_
     user.hashed_password = utils.hash_password(password_reset_request.new_password)
     session.add(user)
     await session.commit()
+
+
+async def get_role_by_title(title: str, session: AsyncSession) -> user_models.Role:
+    query = select(user_models.Role).where(user_models.Role.title == title)
+    result = await session.execute(query)
+    return result.scalar_one_or_none()

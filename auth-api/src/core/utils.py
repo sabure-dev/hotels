@@ -10,6 +10,7 @@ from jwt import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
+from core.tasks import send_verification_email_task, send_password_reset_email_task
 from api.v1.schemas import PasswordResetRequest
 from core.config import settings
 from db.crud import get_user_model_by_email, reset_password_crud
@@ -72,20 +73,6 @@ def validate_password(
     )
 
 
-async def send_password_reset_email(user):
-    reset_token = create_password_reset_token(user)
-    reset_url = f"http://localhost:8000/api/v1/password-reset?token={reset_token}"
-
-    msg = MIMEText(settings.smtp.reset_password_email_template.format(reset_url=reset_url))
-    msg['Subject'] = 'Password Reset Instructions'
-    msg['From'] = settings.smtp.smtp_user
-    msg['To'] = user.email
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-        smtp.login(settings.smtp.smtp_user, settings.smtp.smtp_pass)
-        smtp.send_message(msg)
-
-
 def create_password_reset_token(user):
     data = {"sub": user.email,
             "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.smtp.reset_password_token_expire_minutes)}
@@ -114,20 +101,6 @@ async def reset_password_util(session: AsyncSession, password_reset_request: Pas
         )
 
 
-async def send_verification_email(user):
-    verification_token = create_verification_token(user)
-    verification_url = f"http://localhost:8000/api/v1/verify-email?token={verification_token}"
-
-    msg = MIMEText(f"Пожалуйста, подтвердите ваш email, перейдя по ссылке: {verification_url}")
-    msg['Subject'] = 'Подтверждение email'
-    msg['From'] = settings.smtp.smtp_user
-    msg['To'] = user.email
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-        smtp.login(settings.smtp.smtp_user, settings.smtp.smtp_pass)
-        smtp.send_message(msg)
-
-
 def create_verification_token(user):
     data = {
         "sub": user.email,
@@ -135,3 +108,15 @@ def create_verification_token(user):
     }
     return jwt.encode(data, settings.smtp.email_verification_secret_key,
                       algorithm=settings.smtp.email_verification_algorithm)
+
+
+async def send_verification_email(user):
+    verification_token = create_verification_token(user)
+    verification_url = f"http://localhost:8000/api/v1/verify-email?token={verification_token}"
+    send_verification_email_task.delay(user.email, verification_url)
+
+
+async def send_password_reset_email(user):
+    reset_token = create_password_reset_token(user)
+    reset_url = f"http://localhost:8000/api/v1/password-reset?token={reset_token}"
+    send_password_reset_email_task.delay(user.email, reset_url)

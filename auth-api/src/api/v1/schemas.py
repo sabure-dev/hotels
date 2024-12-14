@@ -1,7 +1,14 @@
 from datetime import datetime
+from enum import Enum
 from typing import Annotated
 from annotated_types import MinLen, MaxLen
 from pydantic import BaseModel, EmailStr, ConfigDict
+
+
+class UserRole(str, Enum):
+    BUYER = 'buyer'
+    SELLER = 'seller'
+    ADMIN = 'admin'
 
 
 class CreateUser(BaseModel):
@@ -10,6 +17,7 @@ class CreateUser(BaseModel):
     email: EmailStr
     hashed_password: str
     full_name: Annotated[str, MaxLen(30)]
+    role: UserRole
 
 
 class ValidateUser(BaseModel):

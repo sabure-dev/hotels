@@ -41,10 +41,16 @@ class SMTPSettings(BaseModel):
     email_verification_algorithm: str = os.environ.get("EMAIL_VERIFICATION_ALGORITHM")
 
 
+class CelerySettings(BaseModel):
+    broker_url: str = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
+    result_backend: str = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/0")
+
+
 class Settings(BaseSettings):
     db: DbSettings = DbSettings()
     smtp: SMTPSettings = SMTPSettings()
     auth_jwt: AuthJWTSettings = AuthJWTSettings()
+    celery: CelerySettings = CelerySettings()
 
 
 settings = Settings()

@@ -11,7 +11,8 @@ from core.utils import send_password_reset_email, reset_password_util, send_veri
 from . import schemas as user_schemas
 from core.helpers import create_refresh_token, create_access_token
 from core.schemas import TokenInfo
-from core.validation import validate_auth_user, get_current_active_auth_user_for_refresh, get_current_active_auth_user
+from core.validation import validate_auth_user, get_current_active_auth_user_for_refresh, \
+    get_current_active_auth_user, validate_create_user_role
 from db.crud import create_user_crud, delete_user_crud, get_user_by_email
 from db.database import get_session
 from .schemas import UserSchema, PasswordResetRequest
@@ -47,7 +48,8 @@ def auth_refresh_jwt(
 
 
 @router.post("/create", response_model=user_schemas.UserOut, status_code=status.HTTP_201_CREATED)
-async def create_user(user: user_schemas.CreateUser, session: AsyncSession = Depends(get_session)):
+async def create_user(user: Annotated[user_schemas.CreateUser, Depends(validate_create_user_role)],
+                      session: AsyncSession = Depends(get_session)):
     user = await create_user_crud(user_in=user, session=session)
     await send_verification_email(user)
     return user
@@ -63,8 +65,8 @@ async def delete_user(user: UserSchema = Depends(get_current_active_auth_user),
 
 @router.post("/password-forgot", status_code=status.HTTP_202_ACCEPTED)
 async def request_password_reset(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    email: Annotated[str, Body()]
+        session: Annotated[AsyncSession, Depends(get_session)],
+        email: Annotated[str, Body()]
 ):
     user = await get_user_by_email(session=session, email=email)
     if not user:
@@ -77,10 +79,10 @@ async def request_password_reset(
     return {"detail": "Password reset instructions sent to email"}
 
 
-@router.get("/password-reset")
+@router.post("/password-reset")
 async def reset_password(
-    session: Annotated[AsyncSession, Depends(get_session)],
-    password_reset_request: Annotated[PasswordResetRequest, Body()]
+        session: Annotated[AsyncSession, Depends(get_session)],
+        password_reset_request: Annotated[PasswordResetRequest, Body()]
 ):
     await reset_password_util(session=session, password_reset_request=password_reset_request)
 
@@ -89,16 +91,16 @@ async def reset_password(
 
 @router.get("/verify-email")
 async def verify_email(
-    token: str,
-    session: AsyncSession = Depends(get_session)
+        token: str,
+        session: AsyncSession = Depends(get_session)
 ):
     try:
         payload = jwt.decode(
-            token, 
+            token,
             settings.smtp.email_verification_secret_key,
             algorithms=[settings.smtp.email_verification_algorithm]
         )
-        
+
         if datetime.now(timezone.utc) > datetime.fromtimestamp(payload["exp"], tz=timezone.utc):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -107,22 +109,22 @@ async def verify_email(
 
         email = payload["sub"]
         user = await get_user_by_email(session=session, email=email)
-        
+
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
-            
+
         if user.is_verified:
             return {"message": "Email already verified"}
-            
+
         user.is_verified = True
         session.add(user)
         await session.commit()
-        
+
         return {"message": "Email verified successfully"}
-        
+
     except jwt.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

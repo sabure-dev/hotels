@@ -4,7 +4,7 @@ from jwt import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from api.v1.schemas import UserOut, UserSchema
+from api.v1.schemas import UserOut, UserSchema, CreateUser, UserRole
 from db.database import get_session
 from .helpers import (
     TOKEN_TYPE_FIELD,
@@ -126,4 +126,13 @@ async def validate_auth_user(
             detail="email not verified",
         )
 
+    return user
+
+
+def validate_create_user_role(user: CreateUser):
+    if user.role == UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Cannot create user with admin role'
+        )
     return user
