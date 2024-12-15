@@ -2,8 +2,9 @@ from datetime import datetime, timezone
 from typing import Annotated
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from pydantic import EmailStr
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import status, Response
 
@@ -13,9 +14,9 @@ from . import schemas as user_schemas
 from core.helpers import create_refresh_token, create_access_token
 from core.schemas import TokenInfo
 from core.validation import validate_auth_user, get_current_active_auth_user_for_refresh, \
-    get_current_active_auth_user, validate_create_user_role
+    get_current_active_auth_user, validate_create_user_role, get_admin_user
 from db.crud import create_user_crud, delete_user_crud, get_user_by_email, update_user_fullname_crud, \
-    update_user_email_crud
+    update_user_email_crud, get_user_by_id, list_users_crud
 from db.database import get_session
 from .schemas import UserSchema, PasswordResetRequest
 
@@ -23,6 +24,53 @@ router = APIRouter(
     prefix="/api/v1",
     tags=["Auth"],
 )
+
+
+@router.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+@router.get("/health/db")
+async def db_health_check(session: AsyncSession = Depends(get_session)):
+    try:
+        await session.execute(text("SELECT 1"))
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database unhealthy: {str(e)}"
+        )
+
+
+@router.get("/me", response_model=user_schemas.UserOut)
+async def get_current_user_profile(
+        user: user_schemas.UserSchema = Depends(get_current_active_auth_user)
+):
+    return user
+
+
+@router.get("/admin/users", response_model=list[user_schemas.UserOut], dependencies=[Depends(get_admin_user)])
+async def list_users(
+        skip: int = 0,
+        limit: int = 100,
+        role: user_schemas.UserRole | None = None,
+        active: bool | None = None,
+        is_verified: bool | None = None,
+        sort_by: str = Query(None, enum=["created_at", "email", "full_name"]),
+        order: str = Query("asc", enum=["asc", "desc"]),
+        session: AsyncSession = Depends(get_session)
+):
+    return await list_users_crud(skip=skip, limit=limit, role=role, active=active, is_verified=is_verified,
+                                 session=session, sort_by=sort_by, order=order)
+
+
+@router.get("/admin/users/{user_id}", response_model=user_schemas.UserOut, dependencies=[Depends(get_admin_user)])
+async def get_user(
+        user_id: int,
+        session: AsyncSession = Depends(get_session)
+):
+    return await get_user_by_id(user_id, session)
 
 
 @router.post("/login")

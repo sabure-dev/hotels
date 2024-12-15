@@ -36,6 +36,7 @@ class UserOut(BaseModel):
     created_at: datetime
     is_verified: bool
     active: bool
+    role_id: int
 
 
 class UserSchema(BaseModel):
@@ -46,6 +47,7 @@ class UserSchema(BaseModel):
     full_name: Annotated[str, MaxLen(30)]
     active: bool
     is_verified: bool
+    role_id: int
 
 
 class PasswordResetRequest(BaseModel):

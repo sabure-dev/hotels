@@ -12,7 +12,7 @@ from .helpers import (
     REFRESH_TOKEN_TYPE,
 )
 from . import utils as auth_utils
-from db.crud import get_user_by_email
+from db.crud import get_user_by_email, get_role_by_title
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/login/",
@@ -93,6 +93,19 @@ def get_current_active_auth_user(
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="inactive user",
+    )
+
+
+async def get_admin_user(
+        user: UserSchema = Depends(get_current_active_auth_user),
+        session: AsyncSession = Depends(get_session),
+):
+    role = await get_role_by_title("admin", session=session)
+    if user.role_id == role.id:
+        return user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="not authorized to perform this action",
     )
 
 

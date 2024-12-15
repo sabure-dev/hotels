@@ -1,8 +1,9 @@
 import sqlalchemy
 from fastapi import HTTPException
 from pydantic import EmailStr
-from sqlalchemy import select
+from sqlalchemy import select, desc, asc
 from fastapi import status
+from sqlalchemy.exc import SQLAlchemyError
 
 from api.v1 import schemas as user_schemas
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,10 @@ from api.v1.schemas import UserSchema, PasswordResetRequest
 import core.utils as utils
 from db import models as user_models
 from core import utils as auth_utils
+
+ALLOWED_SORT_FIELDS = {'created_at', 'email', 'full_name'}
+DEFAULT_LIMIT = 100
+MAX_LIMIT = 1000
 
 
 async def create_user_crud(user_in: user_schemas.CreateUser, session: AsyncSession) -> user_schemas.UserOut:
@@ -112,3 +117,56 @@ async def get_role_by_title(title: str, session: AsyncSession) -> user_models.Ro
     query = select(user_models.Role).where(user_models.Role.title == title)
     result = await session.execute(query)
     return result.scalar_one_or_none()
+
+
+async def list_users_crud(
+        session: AsyncSession,
+        skip: int = 0,
+        limit: int = DEFAULT_LIMIT,
+        role: str | None = None,
+        active: bool | None = None,
+        is_verified: bool | None = None,
+        sort_by: str | None = None,
+        order: str = "asc",
+) -> list[user_schemas.UserOut]:
+    try:
+        limit = min(limit, MAX_LIMIT)
+
+        if sort_by and sort_by not in ALLOWED_SORT_FIELDS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort field. Allowed fields: {', '.join(ALLOWED_SORT_FIELDS)}"
+            )
+
+        query = select(user_models.User)
+
+        filters = {
+            user_models.Role.title: role,
+            user_models.User.active: active,
+            user_models.User.is_verified: is_verified
+        }
+
+        active_filters = {k: v for k, v in filters.items() if v is not None}
+
+        if role is not None:
+            query = query.join(user_models.Role)
+
+        for column, value in active_filters.items():
+            query = query.where(column == value)
+
+        sort_column = getattr(user_models.User, sort_by) if sort_by else user_models.User.id
+        sort_func = desc if order.lower() == "desc" else asc
+        query = query.order_by(sort_func(sort_column))
+
+        query = query.offset(skip).limit(limit)
+
+        result = await session.execute(query)
+        users = result.scalars().all()
+
+        return users
+
+    except SQLAlchemyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error occurred"
+        )
