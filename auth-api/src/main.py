@@ -1,7 +1,11 @@
 import uvicorn
 from fastapi import FastAPI
 from api.v1 import views
-app = FastAPI()
+from core.logger import APILoggingMiddleware
+
+app = FastAPI(title="Auth-API")
+
+app.add_middleware(APILoggingMiddleware)
 
 app.include_router(views.router)
 
