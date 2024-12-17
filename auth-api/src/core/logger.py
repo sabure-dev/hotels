@@ -4,6 +4,8 @@ from pathlib import Path
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from core.metrics import REQUEST_LATENCY, REQUEST_COUNT
+
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True)
 
@@ -23,19 +25,30 @@ api_logger.addHandler(api_handler)
 class APILoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         import time
+
         start_time = time.time()
 
         response = await call_next(request)
 
-        process_time = (time.time() - start_time) * 1000
+        duration = time.time() - start_time
 
         extra = {
-            "method": request.method,
-            "url": request.url,
-            "status_code": response.status_code,
-            "process_time": process_time,
+            'method': request.method,
+            'url': request.url.path,
+            'status_code': response.status_code,
+            'process_time': duration * 1000
         }
-
         api_logger.info('API Request', extra=extra)
+
+        REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=request.url.path,
+            status_code=response.status_code
+        ).inc()
+
+        REQUEST_LATENCY.labels(
+            method=request.method,
+            endpoint=request.url.path
+        ).observe(duration)
 
         return response

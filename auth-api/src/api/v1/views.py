@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import status, Response
 
 from core.config import settings
+from core.metrics import LOGIN_ATTEMPTS, USER_REGISTRATIONS
 from core.utils import send_password_reset_email, reset_password_util, send_verification_email
 from . import schemas as user_schemas
 from core.helpers import create_refresh_token, create_access_token
@@ -75,12 +76,17 @@ async def get_user(
 
 @router.post("/login")
 async def auth_user(user: user_schemas.ValidateUser = Depends(validate_auth_user)):
-    access_token = create_access_token(user)
-    refresh_token = create_refresh_token(user)
-    return TokenInfo(
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    try:
+        access_token = create_access_token(user)
+        refresh_token = create_refresh_token(user)
+        LOGIN_ATTEMPTS.labels(status="success").inc()
+        return TokenInfo(
+            access_token=access_token,
+            refresh_token=refresh_token,
+        )
+    except Exception as e:
+        LOGIN_ATTEMPTS.labels(status="failure").inc()
+        raise
 
 
 @router.post(
@@ -100,9 +106,14 @@ def auth_refresh_jwt(
 @router.post("/create", response_model=user_schemas.UserOut, status_code=status.HTTP_201_CREATED)
 async def create_user(user: Annotated[user_schemas.CreateUser, Depends(validate_create_user_role)],
                       session: AsyncSession = Depends(get_session)):
-    user = await create_user_crud(user_in=user, session=session)
-    await send_verification_email(user)
-    return user
+    try:
+        new_user = await create_user_crud(user, session)
+        await send_verification_email(new_user)
+        USER_REGISTRATIONS.labels(status="success").inc()
+        return new_user
+    except HTTPException as e:
+        USER_REGISTRATIONS.labels(status="failure").inc()
+        raise
 
 
 @router.patch("/update_fullname", response_model=user_schemas.UserOut, status_code=status.HTTP_200_OK)

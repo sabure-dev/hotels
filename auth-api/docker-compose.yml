@@ -9,6 +9,8 @@ services:
       - "1337:5432"
     env_file:
       .env
+    networks:
+      - auth_network
 
   redis:
     hostname: redis
@@ -16,6 +18,8 @@ services:
     container_name: auth_redis
     ports:
       - "6379:6379"
+    networks:
+      - auth_network
 
   celery_worker:
     build:
@@ -24,6 +28,8 @@ services:
     command: bash -c "cd src && celery -A core.celery_app worker -l info -Q emails"
     env_file:
       - .env
+    networks:
+      - auth_network
     depends_on:
       - redis
       - auth_db
@@ -37,6 +43,8 @@ services:
       - "5555:5555"
     env_file:
       - .env
+    networks:
+      - auth_network
     depends_on:
       - redis
       - celery_worker
@@ -54,3 +62,43 @@ services:
       - auth_db
       - redis
       - celery_worker
+      - prometheus
+    networks:
+      - auth_network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: auth_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    networks:
+      - auth_network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: auth_grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - auth_network
+    depends_on:
+      - prometheus
+
+networks:
+  auth_network:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  grafana_data:

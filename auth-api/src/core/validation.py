@@ -13,6 +13,7 @@ from .helpers import (
 )
 from . import utils as auth_utils
 from db.crud import get_user_by_email, get_role_by_title
+from .metrics import LOGIN_ATTEMPTS
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/login/",
@@ -119,21 +120,25 @@ async def validate_auth_user(
         detail="invalid email or password",
     )
     if not (user := await get_user_by_email(email=username, session=session)):
+        LOGIN_ATTEMPTS.labels(status="invalid_user").inc()
         raise unauthed_exc
 
     if not auth_utils.validate_password(
             password=password,
             hashed_password=user.hashed_password,
     ):
+        LOGIN_ATTEMPTS.labels(status="invalid_password").inc()
         raise unauthed_exc
 
     if not user.active:
+        LOGIN_ATTEMPTS.labels(status="inactive_user").inc()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="user inactive",
         )
         
     if not user.is_verified:
+        LOGIN_ATTEMPTS.labels(status="not_verified").inc()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="email not verified",
