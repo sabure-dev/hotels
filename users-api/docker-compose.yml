@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  users_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: users_api
+    ports:
+      - "8001:8080"
+    env_file:
+      - .env
+    depends_on:
+      - users_db
+      - redis
+    networks:
+      - users_network
+    volumes:
+      - ./:/app
+
+  users_db:
+    image: postgres:17
+    container_name: users_db
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_DB=${DB_NAME}
+    volumes:
+      - users_db_data:/var/lib/postgresql/data
+    networks:
+      - users_network
+
+  redis:
+    image: redis:7
+    container_name: users_redis
+    ports:
+      - "6380:6379"
+    networks:
+      - users_network
+
+  users_celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: users_celery
+    command: celery -A core.tasks.celery_app worker --loglevel=info
+    env_file:
+      - .env
+    depends_on:
+      - users_api
+      - redis
+    networks:
+      - users_network
+    volumes:
+      - ./:/app
+    working_dir: /app/src
+
+  users_flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: users_flower
+    command: celery -A core.tasks.celery_app flower --port=5555
+    ports:
+      - "5556:5555"
+    env_file:
+      - .env
+    depends_on:
+      - users_celery
+      - redis
+    networks:
+      - users_network
+    volumes:
+      - ./:/app
+    working_dir: /app/src
+
+  prometheus:
+    image: prom/prometheus:v2.47.2
+    container_name: users_prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - users_network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: users_grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - users_network
+    depends_on:
+      - prometheus
+
+networks:
+  users_network:
+    driver: bridge
+
+volumes:
+  users_db_data:
+  prometheus_data:
+  grafana_data:
