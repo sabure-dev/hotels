@@ -17,9 +17,3 @@ LOGIN_ATTEMPTS = Counter(
     'Total number of login attempts',
     ['status']
 )
-
-USER_REGISTRATIONS = Counter(
-    'auth_user_registrations_total',
-    'Total number of user registrations',
-    ['status']
-)

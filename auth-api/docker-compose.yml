@@ -12,43 +12,6 @@ services:
     networks:
       - auth_network
 
-  redis:
-    hostname: redis
-    image: redis:7
-    container_name: auth_redis
-    ports:
-      - "6379:6379"
-    networks:
-      - auth_network
-
-  celery_worker:
-    build:
-      context: .
-    container_name: auth_celery_worker
-    command: bash -c "cd src && celery -A core.celery_app worker -l info -Q emails"
-    env_file:
-      - .env
-    networks:
-      - auth_network
-    depends_on:
-      - redis
-      - auth_db
-
-  flower:
-    build:
-      context: .
-    container_name: auth_flower
-    command: bash -c "cd src && celery -A core.celery_app flower --port=5555"
-    ports:
-      - "5555:5555"
-    env_file:
-      - .env
-    networks:
-      - auth_network
-    depends_on:
-      - redis
-      - celery_worker
-
   auth_service:
     hostname: auth_service
     build:
@@ -60,8 +23,6 @@ services:
       - .env
     depends_on:
       - auth_db
-      - redis
-      - celery_worker
       - prometheus
     networks:
       - auth_network
