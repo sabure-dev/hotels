@@ -15,11 +15,11 @@ class TokenService:
 
     def create_tokens(self, user: User) -> TokenResponse:
         access_token = self._create_token(
-            user.email,
+            user,
             timedelta(minutes=settings.auth_jwt.access_token_expire_minutes)
         )
         refresh_token = self._create_token(
-            user.email,
+            user,
             timedelta(days=settings.auth_jwt.refresh_token_expire_days)
         )
         return TokenResponse(
@@ -39,9 +39,13 @@ class TokenService:
         except jwt.InvalidTokenError:
             raise InvalidCredentialsException()
 
-    def _create_token(self, subject: str, expires_delta: timedelta) -> str:
+    def _create_token(self, user: User, expires_delta: timedelta) -> str:
         expire = datetime.utcnow() + expires_delta
-        to_encode = {"exp": expire, "sub": subject}
+        to_encode = {
+            "exp": expire,
+            "sub": user.email,
+            "role": user.role
+        }
         return jwt.encode(
             to_encode,
             self.private_key,

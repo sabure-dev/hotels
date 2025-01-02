@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.config.settings import settings
 from core.monitoring.metrics import USER_REGISTRATIONS, PASSWORD_RESETS
 from core.tasks.email import send_verification_email_task, send_password_reset_email_task
+from core.messaging.rabbitmq import rabbitmq_client
 from db.repositories.users import (
     list_users_crud, get_user_by_id, create_user_crud,
     update_user_fullname_crud, update_user_email_crud,
@@ -53,6 +54,21 @@ class UsersService:
     async def create_user(user: CreateUser, session: AsyncSession) -> UserOut:
         try:
             new_user = await create_user_crud(user, session)
+            await rabbitmq_client.publish_message(
+                exchange_name="user_events",
+                routing_key="user.created",
+                message={
+                    "id": new_user.id,
+                    "email": user.email,
+                    "password": user.password,
+                    "full_name": user.full_name,
+                    "role_id": new_user.role_id,
+                    "is_active": new_user.is_active,
+                    "is_verified": new_user.is_verified,
+                    "created_at": new_user.created_at.isoformat(),
+                    "updated_at": new_user.updated_at.isoformat(),
+                }
+            )
             send_verification_email_task.delay(new_user.email)
             USER_REGISTRATIONS.labels(status="success").inc()
             return new_user

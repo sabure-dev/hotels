@@ -9,6 +9,8 @@ from core.utils.util_jwt import TokenService
 from db.repositories.user_repository import UserRepository
 from core.dto.auth_dto import LoginRequest, TokenResponse
 from core.utils.password import verify_password
+from fastapi import HTTPException, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class AuthService(IAuthService):
@@ -52,6 +54,16 @@ class AuthService(IAuthService):
             raise
         except Exception as e:
             raise InvalidCredentialsException()
+
+    async def validate_token(self, token: str) -> dict:
+        try:
+            payload = self.token_service.verify_token(token)
+            return payload
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=str(e)
+            )
 
     def _verify_password(self, plain_password: str, hashed_password: str) -> bool:
         return verify_password(plain_password, hashed_password)

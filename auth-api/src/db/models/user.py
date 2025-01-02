@@ -1,6 +1,5 @@
 from datetime import datetime
 
-import bcrypt
 from sqlalchemy import String, Boolean, DateTime, func, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

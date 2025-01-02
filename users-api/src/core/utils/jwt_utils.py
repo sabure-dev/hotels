@@ -10,8 +10,8 @@ def create_token(data: dict, expires_delta: timedelta) -> str:
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
         to_encode,
-        settings.jwt.secret_key,
-        algorithm=settings.jwt.algorithm
+        settings.smtp.email_verification_secret_key,
+        algorithm=settings.smtp.email_verification_algorithm,
     )
     return encoded_jwt
 
@@ -20,8 +20,8 @@ def decode_access_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(
             token,
-            settings.jwt.secret_key,
-            algorithms=[settings.jwt.algorithm]
+            settings.smtp.email_verification_secret_key,
+            algorithms=[settings.smtp.email_verification_algorithm]
         )
         return payload
     except jwt.InvalidTokenError:

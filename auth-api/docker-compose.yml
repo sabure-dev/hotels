@@ -26,6 +26,23 @@ services:
       - prometheus
     networks:
       - auth_network
+      - hotels_network
+
+  auth_consumer:
+    build:
+      context: .
+    container_name: auth_consumer
+    command: python src/consumer.py
+    env_file:
+      - .env
+    depends_on:
+      - auth_service
+    networks:
+      - auth_network
+      - hotels_network
+    volumes:
+      - ./:/app
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:latest
@@ -59,6 +76,8 @@ services:
 networks:
   auth_network:
     driver: bridge
+  hotels_network:
+    external: true
 
 volumes:
   prometheus_data:

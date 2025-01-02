@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).parent.parent.parent
 
@@ -26,9 +26,19 @@ class AuthJWTSettings(BaseModel):
     refresh_token_expire_days: int = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS"))
 
 
+class RabbitMQSettings(BaseSettings):
+    host: str = "hotels_rabbitmq"
+    port: int = 5672
+    user: str = "admin"
+    password: str = "admin123"
+
+    model_config = SettingsConfigDict(env_prefix='RABBITMQ_')
+
+
 class Settings(BaseSettings):
     db: DbSettings = DbSettings()
     auth_jwt: AuthJWTSettings = AuthJWTSettings()
+    rabbitmq: RabbitMQSettings = RabbitMQSettings()
 
 
 settings = Settings()

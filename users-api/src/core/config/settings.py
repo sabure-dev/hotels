@@ -39,6 +39,14 @@ class CelerySettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='CELERY_')
 
 
+class RabbitMQSettings(BaseSettings):
+    url: str = "amqp://guest:guest@rabbitmq/"
+    exchange_name: str = "user_events"
+    exchange_type: str = "topic"
+
+    model_config = SettingsConfigDict(env_prefix='RABBITMQ_')
+
+
 class AppSettings(BaseSettings):
     frontend_url: str
 
@@ -50,6 +58,7 @@ class Settings(BaseSettings):
     smtp: SMTPSettings = SMTPSettings()
     cors: CORSSettings = CORSSettings()
     celery: CelerySettings = CelerySettings()
+    rabbitmq: RabbitMQSettings = RabbitMQSettings()
     app: AppSettings = AppSettings()
 
 

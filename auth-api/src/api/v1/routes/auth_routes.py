@@ -31,3 +31,15 @@ async def refresh_token(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/validate")
+async def validate_token(
+        controller: AuthController = Depends(get_auth_controller)
+):
+    try:
+        return await controller.validate_token()
+    except AuthException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")

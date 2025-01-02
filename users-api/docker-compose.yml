@@ -15,6 +15,7 @@ services:
       - redis
     networks:
       - users_network
+      - hotels_network
     volumes:
       - ./:/app
 
@@ -53,6 +54,7 @@ services:
       - redis
     networks:
       - users_network
+      - hotels_network
     volumes:
       - ./:/app
     working_dir: /app/src
@@ -110,6 +112,8 @@ services:
 networks:
   users_network:
     driver: bridge
+  hotels_network:
+    external: true
 
 volumes:
   users_db_data:
