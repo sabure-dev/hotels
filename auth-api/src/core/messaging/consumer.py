@@ -5,18 +5,22 @@ from typing import Dict, Callable
 from core.messaging.rabbitmq import rabbitmq_client
 from core.messaging.handlers import (
     handle_user_created,
-    handle_user_updated,
+    handle_user_fullname_updated,
     handle_user_email_updated,
-    handle_user_password_updated
+    handle_user_password_updated,
+    handle_user_deleted,
+    handle_user_email_verified
 )
 
 logger = logging.getLogger(__name__)
 
 EVENT_HANDLERS: Dict[str, Callable] = {
     "user.created": handle_user_created,
-    "user.updated": handle_user_updated,
+    "user.fullname.updated": handle_user_fullname_updated,
     "user.email.updated": handle_user_email_updated,
-    "user.password.updated": handle_user_password_updated
+    "user.password.updated": handle_user_password_updated,
+    "user.deleted": handle_user_deleted,
+    "user.email.verified": handle_user_email_verified
 }
 
 

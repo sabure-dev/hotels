@@ -64,12 +64,12 @@ async def handle_user_created(message: IncomingMessage):
             await message.reject(requeue=True)
 
 
-async def handle_user_updated(message: IncomingMessage):
+async def handle_user_fullname_updated(message: IncomingMessage):
     """Обработчик события обновления пользователя"""
     async with message.process():
         try:
             data = json.loads(message.body.decode())
-            logger.info(f"Received user.updated event for user {data['email']}")
+            logger.info(f"Received user.fullname.updated event for user {data['email']}")
 
             session = await anext(get_session())
             try:
@@ -83,12 +83,7 @@ async def handle_user_updated(message: IncomingMessage):
                     await message.reject(requeue=False)
                     return
 
-                # Обновляем поля пользователя
-                user.email = data['email']
                 user.full_name = data['full_name']
-                user.role_id = data['role_id']
-                user.is_active = data['is_active']
-                user.is_verified = data['is_verified']
                 user.updated_at = datetime.fromisoformat(data['updated_at'])
 
                 await session.commit()
@@ -113,7 +108,6 @@ async def handle_user_updated(message: IncomingMessage):
 
 
 async def handle_user_email_updated(message: IncomingMessage):
-    """Обработчик события смены email пользователя"""
     async with message.process():
         try:
             data = json.loads(message.body.decode())
@@ -131,7 +125,6 @@ async def handle_user_email_updated(message: IncomingMessage):
                     await message.reject(requeue=False)
                     return
 
-                # Обновляем email и статус верификации
                 user.email = data['email']
                 user.is_verified = data['is_verified']
                 user.updated_at = datetime.fromisoformat(data['updated_at'])
@@ -176,7 +169,6 @@ async def handle_user_password_updated(message: IncomingMessage):
                     await message.reject(requeue=False)
                     return
 
-                # Обновляем пароль
                 user.hashed_password = get_password_hash(data['password'])
                 user.updated_at = datetime.fromisoformat(data['updated_at'])
 
@@ -198,4 +190,88 @@ async def handle_user_password_updated(message: IncomingMessage):
 
         except Exception as e:
             logger.error(f"Failed to process user.password.updated event: {str(e)}")
+            await message.reject(requeue=True)
+
+
+async def handle_user_deleted(message: IncomingMessage):
+    """Обработчик события удаления пользователя"""
+    async with message.process():
+        try:
+            data = json.loads(message.body.decode())
+            logger.info(f"Received user.deleted event for user {data['email']}")
+
+            session = await anext(get_session())
+            try:
+                result = await session.execute(
+                    select(User).where(User.id == data['id'])
+                )
+                user = result.scalar_one_or_none()
+
+                if not user:
+                    logger.warning(f"User {data['email']} not found in auth service")
+                    await message.ack()
+                    return
+
+                await session.delete(user)
+                await session.commit()
+
+                logger.info(f"Successfully deleted user {data['email']} from auth service")
+                await message.ack()
+
+            except Exception as e:
+                logger.error(f"Error processing user deletion: {str(e)}")
+                await session.rollback()
+                raise
+            finally:
+                await session.close()
+
+        except KeyError as e:
+            logger.error(f"Invalid message format: {str(e)}")
+            await message.reject(requeue=False)
+
+        except Exception as e:
+            logger.error(f"Failed to process user.deleted event: {str(e)}")
+            await message.reject(requeue=True)
+
+
+async def handle_user_email_verified(message: IncomingMessage):
+    """Обработчик события верификации email пользователя"""
+    async with message.process():
+        try:
+            data = json.loads(message.body.decode())
+            logger.info(f"Received user.email.verified event for user {data['email']}")
+
+            session = await anext(get_session())
+            try:
+                result = await session.execute(
+                    select(User).where(User.id == data['id'])
+                )
+                user = result.scalar_one_or_none()
+
+                if not user:
+                    logger.error(f"User {data['email']} not found in auth service")
+                    await message.reject(requeue=False)
+                    return
+
+                user.is_verified = True
+                user.updated_at = datetime.fromisoformat(data['updated_at'])
+
+                await session.commit()
+
+                logger.info(f"Successfully verified email for user {data['email']}")
+                await message.ack()
+
+            except Exception as e:
+                logger.error(f"Error processing email verification: {str(e)}")
+                await session.rollback()
+                raise
+            finally:
+                await session.close()
+
+        except KeyError as e:
+            logger.error(f"Invalid message format: {str(e)}")
+            await message.reject(requeue=False)
+
+        except Exception as e:
+            logger.error(f"Failed to process user.email.verified event: {str(e)}")
             await message.reject(requeue=True)

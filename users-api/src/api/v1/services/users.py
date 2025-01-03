@@ -12,7 +12,7 @@ from core.messaging.rabbitmq import rabbitmq_client
 from db.repositories.users import (
     list_users_crud, get_user_by_id, create_user_crud,
     update_user_fullname_crud, update_user_email_crud,
-    delete_user_crud, get_user_by_email, update_user_password_crud
+    delete_user_crud, get_user_by_email, update_user_password_crud, get_user_by_email
 )
 from ..schemas import UserSchema, CreateUser, UserRole, PasswordResetRequest, UserOut, UserOutWithRole
 
@@ -127,11 +127,7 @@ class UsersService:
             message={
                 "id": updated_user.id,
                 "email": updated_user.email,
-                "full_name": updated_user.full_name,
-                "role_id": updated_user.role_id,
-                "is_active": updated_user.is_active,
                 "is_verified": updated_user.is_verified,
-                "created_at": updated_user.created_at.isoformat(),
                 "updated_at": updated_user.updated_at.isoformat(),
             }
         )
@@ -142,6 +138,15 @@ class UsersService:
     @staticmethod
     async def delete_user(current_user: UserSchema, session: AsyncSession):
         await delete_user_crud(current_user=current_user, session=session)
+
+        await rabbitmq_client.publish_message(
+            exchange_name="user_events",
+            routing_key="user.deleted",
+            message={
+                "id": current_user.id,
+                "email": current_user.email
+            }
+        )
 
     @staticmethod
     async def request_password_reset(session: AsyncSession, email: str):
@@ -198,11 +203,6 @@ class UsersService:
                     "id": updated_user.id,
                     "email": updated_user.email,
                     "password": password_reset_request.new_password,
-                    "full_name": updated_user.full_name,
-                    "role_id": updated_user.role_id,
-                    "is_active": updated_user.is_active,
-                    "is_verified": updated_user.is_verified,
-                    "created_at": updated_user.created_at.isoformat(),
                     "updated_at": updated_user.updated_at.isoformat(),
                 }
             )
@@ -249,6 +249,18 @@ class UsersService:
             user.is_verified = True
             session.add(user)
             await session.commit()
+            await session.refresh(user)
+
+            await rabbitmq_client.publish_message(
+                exchange_name="user_events",
+                routing_key="user.email.verified",
+                message={
+                    "id": user.id,
+                    "email": user.email,
+                    "is_verified": True,
+                    "updated_at": user.updated_at.isoformat()
+                }
+            )
 
             return {"message": "Email verified successfully"}
 
