@@ -1,10 +1,12 @@
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from core.security.password import get_password_hash
 from .roles import get_role_by_title
 from ..models.user import User
+from ..models.role import Role
 from api.v1.schemas import CreateUser, UserRole
 
 
@@ -18,7 +20,7 @@ async def create_user_crud(user: CreateUser, session: AsyncSession) -> User:
         )
 
     hashed_password = get_password_hash(user.password)
-    
+
     db_user = User(
         email=user.email,
         hashed_password=hashed_password,
@@ -34,16 +36,16 @@ async def create_user_crud(user: CreateUser, session: AsyncSession) -> User:
 
 async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     result = await session.execute(
-        select(User).where(User.email == email)
+        select(User).options(joinedload(User.role)).where(User.email == email)
     )
-    return result.scalar_one_or_none()
+    return result.scalars().first()
 
 
 async def get_user_by_id(user_id: int, session: AsyncSession) -> User | None:
     result = await session.execute(
-        select(User).where(User.id == user_id)
+        select(User).options(joinedload(User.role)).where(User.id == user_id)
     )
-    return result.scalar_one_or_none()
+    return result.scalars().first()
 
 
 async def update_user_fullname_crud(
@@ -85,7 +87,7 @@ async def update_user_password_crud(
 ) -> User:
     hashed_password = get_password_hash(new_password)
     user.hashed_password = hashed_password
-    
+
     session.add(user)
     await session.commit()
     await session.refresh(user)
@@ -107,10 +109,10 @@ async def list_users_crud(
         order: str = "asc",
         session: AsyncSession = None
 ) -> list[User]:
-    query = select(User)
+    query = select(User).options(joinedload(User.role))
 
     if role:
-        query = query.where(User.role == role)
+        query = query.join(Role).where(Role.title == role)
     if active is not None:
         query = query.where(User.is_active == active)
     if is_verified is not None:

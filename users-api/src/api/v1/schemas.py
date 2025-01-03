@@ -45,6 +45,13 @@ class UserOut(UserBase):
         from_attributes = True
 
 
+class UserOutWithRole(UserOut):
+    role: RoleSchema | None = None
+
+    class Config:
+        from_attributes = True
+
+
 class PasswordResetRequest(BaseModel):
     token: str
     new_password: str = Field(..., min_length=8)

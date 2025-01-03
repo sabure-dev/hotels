@@ -1,9 +1,12 @@
+import logging
 from datetime import datetime, timedelta
 import jwt
 from core.config import settings
 from core.dto.auth_dto import TokenResponse
 from db.models.user import User
 from core.exceptions.auth_exceptions import TokenExpiredException, InvalidCredentialsException
+
+logger = logging.getLogger(__name__)
 
 
 class TokenService:
@@ -14,6 +17,7 @@ class TokenService:
             self.public_key = f.read()
 
     def create_tokens(self, user: User) -> TokenResponse:
+        logger.info(f"Creating tokens for user: {user.email}, role: {user.role.title}")
         access_token = self._create_token(
             user,
             timedelta(minutes=settings.auth_jwt.access_token_expire_minutes)
@@ -44,7 +48,7 @@ class TokenService:
         to_encode = {
             "exp": expire,
             "sub": user.email,
-            "role": user.role
+            "role": user.role.title
         }
         return jwt.encode(
             to_encode,

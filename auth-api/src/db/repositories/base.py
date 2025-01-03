@@ -1,4 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from core.interfaces.repository import IRepository
 from sqlalchemy import select
@@ -16,6 +17,6 @@ class BaseRepository(IRepository):
         return result.scalar_one_or_none()
 
     async def get_by_email(self, email: str) -> User:
-        query = select(self.model).where(self.model.email == email)
+        query = select(self.model).options(joinedload(self.model.role)).where(self.model.email == email)
         result = await self.session.execute(query)
         return result.scalar_one_or_none()

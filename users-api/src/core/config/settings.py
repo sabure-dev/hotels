@@ -40,9 +40,13 @@ class CelerySettings(BaseSettings):
 
 
 class RabbitMQSettings(BaseSettings):
-    url: str = "amqp://guest:guest@rabbitmq/"
     exchange_name: str = "user_events"
     exchange_type: str = "topic"
+
+    host: str = "hotels_rabbitmq"
+    port: int = 5672
+    user: str = "admin"
+    password: str = "admin123"
 
     model_config = SettingsConfigDict(env_prefix='RABBITMQ_')
 

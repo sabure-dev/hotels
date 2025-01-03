@@ -14,7 +14,7 @@ from db.repositories.users import (
     update_user_fullname_crud, update_user_email_crud,
     delete_user_crud, get_user_by_email, update_user_password_crud
 )
-from ..schemas import UserSchema, CreateUser, UserRole, PasswordResetRequest, UserOut
+from ..schemas import UserSchema, CreateUser, UserRole, PasswordResetRequest, UserOut, UserOutWithRole
 
 
 class UsersService:
@@ -39,7 +39,7 @@ class UsersService:
             sort_by: str | None,
             order: str,
             session: AsyncSession
-    ) -> list[UserOut]:
+    ) -> list[UserOutWithRole]:
         return await list_users_crud(
             skip=skip, limit=limit, role=role,
             active=active, is_verified=is_verified,
@@ -47,8 +47,12 @@ class UsersService:
         )
 
     @staticmethod
-    async def get_user_by_id(user_id: int, session: AsyncSession) -> UserOut:
+    async def get_user_by_id(user_id: int, session: AsyncSession) -> UserOutWithRole | None:
         return await get_user_by_id(user_id, session)
+
+    @staticmethod
+    async def get_user_by_email(user_email: str, session: AsyncSession) -> UserOutWithRole | None:
+        return await get_user_by_email(session, user_email)
 
     @staticmethod
     async def create_user(user: CreateUser, session: AsyncSession) -> UserOut:
@@ -82,11 +86,24 @@ class UsersService:
             session: AsyncSession,
             current_user: UserSchema
     ) -> UserOut:
-        return await update_user_fullname_crud(
+        updated_user = await update_user_fullname_crud(
             new_fullname=new_fullname,
             session=session,
             current_user=current_user
         )
+
+        await rabbitmq_client.publish_message(
+            exchange_name="user_events",
+            routing_key="user.fullname.updated",
+            message={
+                "id": updated_user.id,
+                "email": updated_user.email,
+                "full_name": updated_user.full_name,
+                "updated_at": updated_user.updated_at.isoformat(),
+            }
+        )
+
+        return updated_user
 
     @staticmethod
     async def update_user_email(
@@ -94,11 +111,31 @@ class UsersService:
             session: AsyncSession,
             current_user: UserSchema
     ) -> UserOut:
+        if new_email == current_user.email:
+            raise HTTPException(detail="New email should be different from existing",
+                                status_code=status.HTTP_400_BAD_REQUEST)
+
         updated_user = await update_user_email_crud(
             new_email=new_email,
             session=session,
             current_user=current_user
         )
+
+        await rabbitmq_client.publish_message(
+            exchange_name="user_events",
+            routing_key="user.email.updated",
+            message={
+                "id": updated_user.id,
+                "email": updated_user.email,
+                "full_name": updated_user.full_name,
+                "role_id": updated_user.role_id,
+                "is_active": updated_user.is_active,
+                "is_verified": updated_user.is_verified,
+                "created_at": updated_user.created_at.isoformat(),
+                "updated_at": updated_user.updated_at.isoformat(),
+            }
+        )
+
         send_verification_email_task.delay(updated_user.email)
         return updated_user
 
@@ -148,10 +185,26 @@ class UsersService:
                     detail="User not found"
                 )
 
-            await update_user_password_crud(
+            updated_user = await update_user_password_crud(
                 user=user,
                 new_password=password_reset_request.new_password,
                 session=session
+            )
+
+            await rabbitmq_client.publish_message(
+                exchange_name="user_events",
+                routing_key="user.password.updated",
+                message={
+                    "id": updated_user.id,
+                    "email": updated_user.email,
+                    "password": password_reset_request.new_password,
+                    "full_name": updated_user.full_name,
+                    "role_id": updated_user.role_id,
+                    "is_active": updated_user.is_active,
+                    "is_verified": updated_user.is_verified,
+                    "created_at": updated_user.created_at.isoformat(),
+                    "updated_at": updated_user.updated_at.isoformat(),
+                }
             )
 
             PASSWORD_RESETS.labels(status="success").inc()

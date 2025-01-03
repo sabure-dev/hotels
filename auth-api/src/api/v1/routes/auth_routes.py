@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from core.dto.auth_dto import LoginRequest, TokenResponse, RefreshTokenRequest
 from api.v1.controllers.auth_controller import AuthController
 from core.dependencies.dependencies import get_auth_controller
@@ -35,10 +35,11 @@ async def refresh_token(
 
 @router.post("/validate")
 async def validate_token(
-        controller: AuthController = Depends(get_auth_controller)
+        controller: AuthController = Depends(get_auth_controller),
+        authorization: str | None = Header(default=None, alias="Authorization")
 ):
     try:
-        return await controller.validate_token()
+        return await controller.validate_token(authorization)
     except AuthException as e:
         raise e
     except Exception as e:

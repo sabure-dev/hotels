@@ -3,7 +3,7 @@ from fastapi import APIRouter
 from ..controllers.users import UsersController
 
 router = APIRouter(
-    prefix="/api/v1",
+    prefix="/api/v1/users",
     tags=["Users"],
 )
 

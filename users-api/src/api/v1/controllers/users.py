@@ -4,7 +4,7 @@ from pydantic import EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.session.database import get_session
-from ..schemas import UserSchema, UserOut, CreateUser, UserRole, PasswordResetRequest
+from ..schemas import UserSchema, UserOut, CreateUser, UserRole, PasswordResetRequest, UserOutWithRole
 from ..services.users import UsersService
 
 
@@ -23,11 +23,7 @@ class UsersController:
     async def get_current_user_profile(
         email: str,
         session: AsyncSession = Depends(get_session)
-    ) -> UserOut:
-        """
-        Получить информацию о текущем пользователе.
-        Email получаем из заголовка X-User-Email, который устанавливает gateway
-        """
+    ) -> UserOutWithRole | None:
         return await UsersService.get_user_by_email(email, session)
 
     @staticmethod
@@ -40,7 +36,7 @@ class UsersController:
         sort_by: str = Query(None, enum=["created_at", "email", "full_name"]),
         order: str = Query("asc", enum=["asc", "desc"]),
         session: AsyncSession = Depends(get_session)
-    ) -> list[UserOut]:
+    ) -> list[UserOutWithRole]:
         """Получить список пользователей"""
         return await UsersService.list_users(
             skip=skip, limit=limit, role=role,
@@ -52,14 +48,14 @@ class UsersController:
     async def get_user(
         user_id: int,
         session: AsyncSession = Depends(get_session)
-    ) -> UserOut:
+    ) -> UserOutWithRole | None:
         return await UsersService.get_user_by_id(user_id, session)
 
     @staticmethod
     async def create_user(
         user: CreateUser,
         session: AsyncSession = Depends(get_session)
-    ) -> UserOut:
+    ) -> UserOut | None:
         return await UsersService.create_user(user, session)
 
     @staticmethod
