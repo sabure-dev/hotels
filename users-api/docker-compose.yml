@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: users_api
     ports:
-      - "8001:8080"
+      - "8000:8080"
     env_file:
       - .env
     depends_on:

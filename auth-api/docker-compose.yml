@@ -9,6 +9,8 @@ services:
       - "1337:5432"
     env_file:
       .env
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
     networks:
       - auth_network
 
@@ -18,7 +20,7 @@ services:
       context: .
     container_name: auth_service
     ports:
-      - "8000:8080"
+      - "8080:8080"
     env_file:
       - .env
     depends_on:
@@ -80,5 +82,6 @@ networks:
     external: true
 
 volumes:
+  auth_db_data:
   prometheus_data:
   grafana_data:
